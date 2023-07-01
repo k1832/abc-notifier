@@ -138,7 +138,7 @@ function loginAndGetSessionCookie(username, password) {
     const payload = {
         username: encodeURIComponent(username),
         password: encodeURIComponent(password),
-        csrf_token: encodeURIComponent(csrfToken) // No need to encode the CSRF token
+        csrf_token: encodeURIComponent(csrfToken)
     };
 
     const formData = `username=${payload.username}&password=${payload.password}&csrf_token=${payload.csrf_token}`;
@@ -169,11 +169,10 @@ function loginAndGetSessionCookie(username, password) {
         return null;
     }
 
-    // Extract session cookie
+    // Step 3: Extract the session cookie and cache it
     const setCookieArray = response.getAllHeaders()['Set-Cookie'];
     const sessionCookie = setCookieArray.find(cookie => cookie.startsWith('REVEL_SESSION')).split(';')[0];
 
-    // Cache the session cookie for future use (e.g., 1 hour)
     cache.put('sessionCookie', sessionCookie, 3600);
 
     return sessionCookie;
