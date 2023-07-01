@@ -1,7 +1,6 @@
 let SPRSHEET = null;
 let CONTEST_SHEET = null;
 
-// Will be updated in "notifyIfUpdatedForRandom"
 let nextContestName = null;
 
 function myFunction() {
