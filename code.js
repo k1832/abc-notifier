@@ -163,9 +163,17 @@ function loginAndGetSessionCookie(username, password) {
         return null;
     }
 
-    // Step 3: Save and manage cookies for future requests
+    const redirectLocation = response.getHeaders()['Location'];
+    if (redirectLocation != "/home") {
+        console.log({redirectLocation})
+        console.error("Failed to login. Maybe wrong username or password?");
+        return null;
+    }
+
+    // Extract session cookie
     const setCookieArray = response.getAllHeaders()['Set-Cookie'];
     const sessionCookie = setCookieArray.find(cookie => cookie.startsWith('REVEL_SESSION')).split(';')[0];
+
     // Cache the session cookie for future use (e.g., 1 hour)
     cache.put('sessionCookie', sessionCookie, 3600);
 
