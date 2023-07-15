@@ -40,7 +40,7 @@ function helper() {
 
         console.error("Something's wrong!!");
         if (i + 1 < TRIAL_COUNT) {
-            console.log(`Retrying.. ${i+2} / ${TRIAL_COUNT}`);
+            console.log(`Retrying.. ${i + 2} / ${TRIAL_COUNT}`);
             Utilities.sleep(3000);
         }
     }
@@ -50,7 +50,6 @@ function helper() {
 
 function notifyIfContestFixed() {
     // Main function that wraps with time range validation
-    console.log("TRIGGERED!")
     if (!inTimeRange()) {
         return;
     }
@@ -75,7 +74,7 @@ function isContestFixed(username, password, contestName) {
     const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/standings/json`;
     const response = UrlFetchApp.fetch(contestStandingUrl, options);
     if (response.getResponseCode() !== 200) {
-        console.log(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
+        console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
         console.log("HTML content:")
         console.log(response.getContentText("UTF-8"));
         return null;
@@ -83,17 +82,17 @@ function isContestFixed(username, password, contestName) {
 
     const htmlText = response.getContentText();
     const json = JSON.parse(htmlText);
-    const fixedPropertyName = "Fixed";
-    if (json.hasOwnProperty(fixedPropertyName)) {
-        return json[fixedPropertyName];
-    } else {
-        console.log(`Standing JSON does not have "${fixedPropertyName}"`);
-        return null;
-    }
+
+    const FIXED_PROPERTY_NAME = "Fixed";
+    if (json.hasOwnProperty(FIXED_PROPERTY_NAME))
+        return json[FIXED_PROPERTY_NAME];
+
+    console.log(`Standing JSON does not have "${FIXED_PROPERTY_NAME}"`);
+    return null;
 }
 
 function decodeHtmlEntities(str) {
-    return str.replace(/&#(\d+);/g, function(_, dec) {
+    return str.replace(/&#(\d+);/g, function (_, dec) {
         return String.fromCharCode(dec);
     });
 }
@@ -164,7 +163,7 @@ function loginAndGetSessionCookie(username, password) {
 
     const redirectLocation = response.getHeaders()['Location'];
     if (redirectLocation != "/home") {
-        console.log({redirectLocation})
+        console.log({ redirectLocation })
         console.error("Failed to login. Maybe wrong username or password?");
         return null;
     }
