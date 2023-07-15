@@ -1,5 +1,11 @@
 let SPRSHEET = null;
 let CONTEST_SHEET = null;
+let CACHE_SERVICE = null;
+
+// Cache names
+const SESSION_COOKIE_CACHE_NAME = 'sessionCookie';
+// TODO(k1832): Consider caching next contest name instead of last
+const LAST_CONTEST_CACHE_NAME = 'contestName';
 
 let nextContestName = null;
 
@@ -12,10 +18,29 @@ function myFunction() {
  * Updated version with login
  */
 
+function assignCacheService() {
+    if (CACHE_SERVICE) return;
+
+    CACHE_SERVICE = CacheService.getScriptCache();
+}
+
+function getLastContestName() {
+    assignCacheService();
+
+    let lastContestName = CACHE_SERVICE.get(LAST_CONTEST_CACHE_NAME);
+    if (lastContestName)
+        return lastContestName;
+
+    assignContestSheet();
+    lastContestName = CONTEST_SHEET.getRange("B2").getValue();
+    CACHE_SERVICE.put(LAST_CONTEST_CACHE_NAME, lastContestName, 3600);
+    return lastContestName;
+}
+
 // Actual logic
 function helper() {
     assignContestSheet();
-    const lastContestName = CONTEST_SHEET.getRange(`B2`).getValue();
+    const lastContestName = getLastContestName();
     const lastContestNumber = parseInt(lastContestName.substr(3));
     nextContestName = `abc${lastContestNumber + 1}`;
     console.log(`Next contest: ${nextContestName}`)
@@ -98,26 +123,27 @@ function decodeHtmlEntities(str) {
 }
 
 function clearCachedSession() {
-    CacheService.getScriptCache().remove('sessionCookie');
+    assignCacheService();
+    CacheService.getScriptCache().remove(SESSION_COOKIE_CACHE_NAME);
 }
 
 /* This function caches the session */
 function loginAndGetSessionCookie(username, password) {
-    const cache = CacheService.getScriptCache();
-    const cachedSessionCookie = cache.get('sessionCookie');
+    assignCacheService();
+    const cachedSessionCookie = CACHE_SERVICE.get(SESSION_COOKIE_CACHE_NAME);
     if (cachedSessionCookie) {
         console.log("Found cached session cookie!");
         return cachedSessionCookie;
-    } else {
-        console.log("Not found cached session cookie. Getting new one.");
     }
 
-    const loginUrl = 'https://atcoder.jp/login';
+    console.log("Not found cached session cookie. Getting new one.");
+
+    const LOGIN_URL = 'https://atcoder.jp/login';
 
     // Step 1: Fetch the login page and extract the CSRF token
-    let response = UrlFetchApp.fetch(loginUrl, { muteHttpExceptions: true });
+    let response = UrlFetchApp.fetch(LOGIN_URL, { muteHttpExceptions: true });
     if (response.getResponseCode() !== 200) {
-        console.log(`Request to ${loginUrl} failed. Status code: ${response.getResponseCode()}`);
+        console.error(); (`Request to ${LOGIN_URL} failed. Status code: ${response.getResponseCode()}`);
         console.log("HTML content:")
         console.log(response.getContentText("UTF-8"));
         return null;
@@ -153,9 +179,9 @@ function loginAndGetSessionCookie(username, password) {
         followRedirects: false,
     };
 
-    response = UrlFetchApp.fetch(loginUrl, options);
+    response = UrlFetchApp.fetch(LOGIN_URL, options);
     if (response.getResponseCode() < 300 || response.getResponseCode() >= 400) {
-        console.log(`Login request to ${loginUrl} failed. Status code: ${response.getResponseCode()}`);
+        console.error(`Login request to ${LOGIN_URL} failed. Status code: ${response.getResponseCode()}`);
         console.log("HTML content:")
         console.log(response.getContentText("UTF-8"));
         return null;
@@ -172,7 +198,7 @@ function loginAndGetSessionCookie(username, password) {
     const setCookieArray = response.getAllHeaders()['Set-Cookie'];
     const sessionCookie = setCookieArray.find(cookie => cookie.startsWith('REVEL_SESSION')).split(';')[0];
 
-    cache.put('sessionCookie', sessionCookie, 3600);
+    CACHE_SERVICE.put(SESSION_COOKIE_CACHE_NAME, sessionCookie, 3600);
 
     return sessionCookie;
 }
@@ -223,8 +249,11 @@ function inTimeRange() {
 function addNextContestIntoSheet() {
     assignContestSheet();
     CONTEST_SHEET.insertRowBefore(2);
-    CONTEST_SHEET.getRange(`A2:B2`).setValues([[new Date(), nextContestName]]);
+    CONTEST_SHEET.getRange("A2:B2").setValues([[new Date(), nextContestName]]);
     console.log(`${nextContestName} is added to the sheet.`)
+
+    assignCacheService();
+    CACHE_SERVICE.put(LAST_CONTEST_CACHE_NAME, nextContestName, 3600);
 }
 
 function updateSheetAndNotify() {
