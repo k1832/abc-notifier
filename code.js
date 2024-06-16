@@ -98,8 +98,7 @@ function isContestFixed(username, password, contestName) {
         followRedirects: false,
     };
 
-    // TODO(k1832): Consider using https://atcoder.jp/contests/${contestName}/results/json
-    const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/standings/json`;
+    const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/results/json`;
     const response = UrlFetchApp.fetch(contestStandingUrl, options);
     if (response.getResponseCode() !== 200) {
         console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
@@ -111,12 +110,14 @@ function isContestFixed(username, password, contestName) {
     const htmlText = response.getContentText();
     contestResultJson = JSON.parse(htmlText);
 
-    const FIXED_PROPERTY_NAME = "Fixed";
-    if (contestResultJson.hasOwnProperty(FIXED_PROPERTY_NAME))
-        return contestResultJson[FIXED_PROPERTY_NAME];
+    const resultLength = contestResultJson.length;
+    if (typeof (resultLength) !== "number") {
+        console.error("Contest result JSON is not an array.");
+        console.log(`contestResultJson: ${contestResultJson}`);
+        return null;
+    }
 
-    console.log(`Standing JSON does not have "${FIXED_PROPERTY_NAME}"`);
-    return null;
+    return resultLength > 0;
 }
 
 function decodeHtmlEntities(str) {
@@ -263,32 +264,32 @@ function notifyInDiscord(msg) {
     // Author & his friends
     const discordUsers = new Set(["k1832", "maeda__1221", " oirom0528"]);
     let participated = false;
-    for (let i = 0; i < contestResultJson.StandingsData.length; ++i) {
-        const userScreenName = contestResultJson.StandingsData[i].UserScreenName;
+    for (let i = 0; i < contestResultJson.length; ++i) {
+        const userScreenName = contestResultJson[i].UserScreenName;
         if (!discordUsers.has(userScreenName)) continue;
 
         discordUsers.delete(userScreenName);
         participated = true;
 
-        const rating = contestResultJson.StandingsData[i].Rating;
-        const oldRating = contestResultJson.StandingsData[i].OldRating;
-        msg += `\n${userScreenName}: ${oldRating} -> ${rating}`;
-        if (Math.floor(oldRating / 400) != Math.floor(rating / 400)) {
+        const oldRating = contestResultJson[i].OldRating;
+        const newRating = contestResultJson[i].NewRating;
+        msg += `\n${userScreenName}: ${oldRating} -> ${newRating}`;
+        if (Math.floor(oldRating / 400) != Math.floor(newRating / 400)) {
             // Rating color changed
-            if (rating > oldRating) {
-                msg += ` (+${rating - oldRating})`;
+            if (newRating > oldRating) {
+                msg += ` (+${newRating - oldRating})`;
                 msg += "\n色変おめでとう！！🎉😻🎉";
             } else {
-                msg += ` (-${oldRating - rating})`;
+                msg += ` (-${oldRating - newRating})`;
                 msg += "\n今日はやけ酒😭😭😭";
             }
         } else {
-            if (rating == oldRating) {
+            if (newRating == oldRating) {
                 msg += " (±0) 😐";
-            } else if (rating > oldRating) {
-                msg += ` (+${rating - oldRating}) 🎉`;
+            } else if (newRating > oldRating) {
+                msg += ` (+${newRating - oldRating}) 🎉`;
             } else {
-                msg += ` (-${oldRating - rating}) 😭`;
+                msg += ` (-${oldRating - newRating}) 😭`;
             }
         }
 
