@@ -7,6 +7,8 @@ const SESSION_COOKIE_CACHE_NAME = 'sessionCookie';
 // TODO(k1832): Consider caching next contest name instead of last
 const LAST_CONTEST_CACHE_NAME = 'contestName';
 
+let contestResultJson = null;
+
 let nextContestName = null;
 
 function myFunction() {
@@ -49,7 +51,7 @@ function helper() {
     const password = PropertiesService.getScriptProperties().getProperty("ATCODER_PASSWORD");
 
     const TRIAL_COUNT = 2;
-    for (let i = 0; i < TRIAL_COUNT; ++i) {
+    for (let i = 1; i <= TRIAL_COUNT; ++i) {
         const fixed = isContestFixed(username, password, nextContestName);
 
         if (fixed === true) {
@@ -64,8 +66,8 @@ function helper() {
         }
 
         console.error("Something's wrong!!");
-        if (i + 1 < TRIAL_COUNT) {
-            console.log(`Retrying.. ${i + 2} / ${TRIAL_COUNT}`);
+        if (i + 1 <= TRIAL_COUNT) {
+            console.log(`Retrying.. ${i + 1} / ${TRIAL_COUNT}`);
             Utilities.sleep(3000);
         }
     }
@@ -96,6 +98,7 @@ function isContestFixed(username, password, contestName) {
         followRedirects: false,
     };
 
+    // TODO(k1832): Consider using https://atcoder.jp/contests/${contestName}/results/json
     const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/standings/json`;
     const response = UrlFetchApp.fetch(contestStandingUrl, options);
     if (response.getResponseCode() !== 200) {
@@ -106,11 +109,11 @@ function isContestFixed(username, password, contestName) {
     }
 
     const htmlText = response.getContentText();
-    const json = JSON.parse(htmlText);
+    contestResultJson = JSON.parse(htmlText);
 
     const FIXED_PROPERTY_NAME = "Fixed";
-    if (json.hasOwnProperty(FIXED_PROPERTY_NAME))
-        return json[FIXED_PROPERTY_NAME];
+    if (contestResultJson.hasOwnProperty(FIXED_PROPERTY_NAME))
+        return contestResultJson[FIXED_PROPERTY_NAME];
 
     console.log(`Standing JSON does not have "${FIXED_PROPERTY_NAME}"`);
     return null;
@@ -143,7 +146,7 @@ function loginAndGetSessionCookie(username, password) {
     // Step 1: Fetch the login page and extract the CSRF token
     let response = UrlFetchApp.fetch(LOGIN_URL, { muteHttpExceptions: true });
     if (response.getResponseCode() !== 200) {
-        console.error(); (`Request to ${LOGIN_URL} failed. Status code: ${response.getResponseCode()}`);
+        console.error(`Login request to ${LOGIN_URL} failed. Status code: ${response.getResponseCode()}`);
         console.log("HTML content:")
         console.log(response.getContentText("UTF-8"));
         return null;
@@ -256,9 +259,51 @@ function addNextContestIntoSheet() {
     CACHE_SERVICE.put(LAST_CONTEST_CACHE_NAME, nextContestName, 3600);
 }
 
+function notifyInDiscord(msg) {
+    // Author & his friends
+    const discordUsers = new Set(["k1832", "maeda__1221", " oirom0528"]);
+    let participated = false;
+    for (let i = 0; i < contestResultJson.StandingsData.length; ++i) {
+        const userScreenName = contestResultJson.StandingsData[i].UserScreenName;
+        if (!discordUsers.has(userScreenName)) continue;
+
+        discordUsers.delete(userScreenName);
+        participated = true;
+
+        const rating = contestResultJson.StandingsData[i].Rating;
+        const oldRating = contestResultJson.StandingsData[i].OldRating;
+        msg += `\n${userScreenName}: ${oldRating} -> ${rating}`;
+        if (Math.floor(oldRating / 400) != Math.floor(rating / 400)) {
+            // Rating color changed
+            if (rating > oldRating) {
+                msg += ` (+${rating - oldRating})`;
+                msg += "\n色変おめでとう！！🎉😻🎉";
+            } else {
+                msg += ` (-${oldRating - rating})`;
+                msg += "\n今日はやけ酒😭😭😭";
+            }
+        } else {
+            if (rating == oldRating) {
+                msg += " (±0) 😐";
+            } else if (rating > oldRating) {
+                msg += ` (+${rating - oldRating}) 🎉`;
+            } else {
+                msg += ` (-${oldRating - rating}) 😭`;
+            }
+        }
+
+        if (discordUsers.size === 0) break;
+    }
+
+    if (!participated) {
+        msg += "\nNo one participated as rated in this contest 👎";
+    }
+    sendMsgDiscord(msg);
+}
+
 function updateSheetAndNotify() {
     const contestURL = `https://atcoder.jp/contests/${nextContestName}`;
-    const msg = `${nextContestName.toUpperCase()}の結果が更新されました。\n${contestURL}`;
+    let msg = `${nextContestName.toUpperCase()}の結果が更新されました。\n${contestURL}`;
 
     try {
         sendTweet(msg);
@@ -272,6 +317,12 @@ function updateSheetAndNotify() {
     );
     sendMessages([msg], DEBUG_GROUP_ID);
     addNextContestIntoSheet();
+
+    /*
+     * Low priority. Should be at the end of the function
+     * to avoid disturbing other notifications.
+     */
+    notifyInDiscord(msg);
 }
 
 
@@ -350,4 +401,17 @@ function sendTweet(tweet_content) {
         console.error(`Could not post tweet:\n${tweet_content}`);
         throw new Error("Twitter auth seemed to fail.");
     }
+}
+
+function sendMsgDiscord(msg) {
+    const MRK_WEBHOOK_URL = PropertiesService.getScriptProperties().getProperty("DISCORD_MRK_WEBHOOK_URL");
+    const payload = {
+        content: msg,
+    };
+
+    UrlFetchApp.fetch(MRK_WEBHOOK_URL, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+    });
 }
