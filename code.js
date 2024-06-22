@@ -260,7 +260,12 @@ function addNextContestIntoSheet() {
     CACHE_SERVICE.put(LAST_CONTEST_CACHE_NAME, nextContestName, 3600);
 }
 
-function notifyInDiscord(msg) {
+function notifyInDiscord() {
+    const contestURL = `https://atcoder.jp/contests/${nextContestName}`;
+    const upperContestName = nextContestName.toUpperCase();
+    const contestURLMarkdown = `[${upperContestName}](${contestURL})`;
+    let msg = `[${contestURLMarkdown}]`;
+
     // Author & his friends
     const discordUsers = new Set(["k1832", "maeda__1221", " oirom0528"]);
     let participated = false;
@@ -301,7 +306,7 @@ function notifyInDiscord(msg) {
     }
 
     if (!participated) {
-        msg += "\nNo one participated as rated in this contest 👎";
+        msg += "\n誰もRatedで参加しなかったようだ👎";
     }
     sendMsgDiscord(msg);
 }
@@ -327,7 +332,7 @@ function updateSheetAndNotify() {
      * Low priority. Should be at the end of the function
      * to avoid disturbing other notifications.
      */
-    notifyInDiscord(msg);
+    notifyInDiscord();
 }
 
 
