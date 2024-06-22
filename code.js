@@ -275,7 +275,9 @@ function notifyInDiscord(msg) {
 
         const oldRating = contestResultJson[i].OldRating;
         const newRating = contestResultJson[i].NewRating;
-        msg += `\n[${userScreenName}](${userPageURL}): ${oldRating} -> ${newRating}`;
+        msg += "\n";
+        msg += `[${userScreenName}](${userPageURL})`; // Markdown link for the user
+        msg += `: ${oldRating} -> ${newRating}`;
         if (Math.floor(oldRating / 400) != Math.floor(newRating / 400)) {
             // Rating color changed
             if (newRating > oldRating) {
