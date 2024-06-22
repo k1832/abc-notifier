@@ -261,7 +261,8 @@ function addNextContestIntoSheet() {
 }
 
 function notifyInDiscord() {
-    const contestURL = `https://atcoder.jp/contests/${nextContestName}`;
+    const atcoderBaseURL = "https://atcoder.jp";
+    const contestURL = `${atcoderBaseURL}/contests/${nextContestName}`;
     const upperContestName = nextContestName.toUpperCase();
     const contestURLMarkdown = `[${upperContestName}](${contestURL})`;
     let msg = `[${contestURLMarkdown}]`;
@@ -275,7 +276,7 @@ function notifyInDiscord() {
 
         discordUsers.delete(userScreenName);
 
-        const userPageURL = `https://atcoder.jp/users/${userScreenName}`;
+        const userPageURL = `${atcoderBaseURL}/users/${userScreenName}`;
 
         const oldRating = contestResultJson[i].OldRating;
         const newRating = contestResultJson[i].NewRating;
