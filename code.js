@@ -292,7 +292,6 @@ function notifyInDiscord() {
             continue;
         }
 
-        participated = true;
         if (Math.floor(oldRating / 400) != Math.floor(newRating / 400)) {
             // Rating color changed
             if (newRating > oldRating) {
