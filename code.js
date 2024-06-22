@@ -271,9 +271,11 @@ function notifyInDiscord(msg) {
         discordUsers.delete(userScreenName);
         participated = true;
 
+        const userPageURL = `https://atcoder.jp/users/${userScreenName}`;
+
         const oldRating = contestResultJson[i].OldRating;
         const newRating = contestResultJson[i].NewRating;
-        msg += `\n${userScreenName}: ${oldRating} -> ${newRating}`;
+        msg += `\n[${userScreenName}](${userPageURL}): ${oldRating} -> ${newRating}`;
         if (Math.floor(oldRating / 400) != Math.floor(newRating / 400)) {
             // Rating color changed
             if (newRating > oldRating) {
