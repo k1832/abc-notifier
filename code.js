@@ -274,15 +274,24 @@ function notifyInDiscord() {
         if (!discordUsers.has(userScreenName)) continue;
 
         discordUsers.delete(userScreenName);
-        participated = true;
 
         const userPageURL = `https://atcoder.jp/users/${userScreenName}`;
 
         const oldRating = contestResultJson[i].OldRating;
         const newRating = contestResultJson[i].NewRating;
+        const isRated = contestResultJson[i].IsRated;
         msg += "\n";
         msg += `[${userScreenName}](${userPageURL})`; // Markdown link for the user
         msg += `: ${oldRating} -> ${newRating}`;
+
+        if (isRated) {
+            participated = true;
+        } else {
+            msg += " (Unrated)";
+            continue;
+        }
+
+        participated = true;
         if (Math.floor(oldRating / 400) != Math.floor(newRating / 400)) {
             // Rating color changed
             if (newRating > oldRating) {
