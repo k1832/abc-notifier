@@ -270,7 +270,7 @@ function notifyInDiscord() {
     // Author & his friends
     const discordUsers = new Set(["k1832", "maeda__1221", " oirom0528"]);
     let participated = false;
-    for (let i = 0; i < contestResultJson.length; ++i) {
+    for (let i = 0; (i < contestResultJson.length) && (discordUsers.size > 0); ++i) {
         const userScreenName = contestResultJson[i].UserScreenName;
         if (!discordUsers.has(userScreenName)) continue;
 
@@ -310,8 +310,6 @@ function notifyInDiscord() {
                 msg += ` (-${oldRating - newRating}) 😭`;
             }
         }
-
-        if (discordUsers.size === 0) break;
     }
 
     if (!participated) {
