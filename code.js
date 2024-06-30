@@ -76,11 +76,10 @@ function helper() {
 }
 
 function notifyIfContestFixed() {
-    // Main function that wraps with time range validation
-    if (!inTimeRange()) {
-        return;
+    // Call the main logic only if it's in time range
+    if (inTimeRange()) {
+        helper();
     }
-    helper();
 }
 
 function isContestFixed(username, password, contestName) {
