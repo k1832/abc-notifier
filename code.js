@@ -47,12 +47,9 @@ function helper() {
     nextContestName = `abc${lastContestNumber + 1}`;
     console.log(`Next contest: ${nextContestName}`)
 
-    const username = PropertiesService.getScriptProperties().getProperty("ATCODER_USERNAME");
-    const password = PropertiesService.getScriptProperties().getProperty("ATCODER_PASSWORD");
-
     const TRIAL_COUNT = 2;
     for (let i = 1; i <= TRIAL_COUNT; ++i) {
-        const fixed = isContestFixed(username, password, nextContestName);
+        const fixed = isContestFixed(nextContestName);
 
         if (fixed === true) {
             updateSheetAndNotify();
@@ -82,8 +79,8 @@ function notifyIfContestFixed() {
     }
 }
 
-function isContestFixed(username, password, contestName) {
-    const sessionCookie = loginAndGetSessionCookie(username, password);
+function isContestFixed(contestName) {
+    const sessionCookie = loginAndGetSessionCookie();
     if (sessionCookie === null) {
         console.error("Something's wrong!");
         return null;
@@ -131,7 +128,7 @@ function clearCachedSession() {
 }
 
 /* This function caches the session */
-function loginAndGetSessionCookie(username, password) {
+function loginAndGetSessionCookie() {
     assignCacheService();
     const cachedSessionCookie = CACHE_SERVICE.get(SESSION_COOKIE_CACHE_NAME);
     if (cachedSessionCookie) {
@@ -163,6 +160,8 @@ function loginAndGetSessionCookie(username, password) {
     const csrfToken = decodeHtmlEntities(csrfTokenMatch[1]);
 
     // Step 2: Send a POST request with your login credentials and the extracted CSRF token
+    const username = PropertiesService.getScriptProperties().getProperty("ATCODER_USERNAME");
+    const password = PropertiesService.getScriptProperties().getProperty("ATCODER_PASSWORD");
     const payload = {
         username: encodeURIComponent(username),
         password: encodeURIComponent(password),
