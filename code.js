@@ -82,7 +82,7 @@ function notifyIfContestFixed() {
 function isContestFixed(contestName) {
     const sessionCookie = loginAndGetSessionCookie();
     if (sessionCookie === null) {
-        console.error("Something's wrong!");
+        console.error("Something went wrong while getting the session cookie.");
         return null;
     }
 
@@ -195,6 +195,8 @@ function loginAndGetSessionCookie() {
         console.error("Failed to login. Maybe wrong username or password?");
         return null;
     }
+
+    console.log("Successfully logged in to AtCoder.")
 
     // Step 3: Extract the session cookie and cache it
     const setCookieArray = response.getAllHeaders()['Set-Cookie'];
