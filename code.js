@@ -12,8 +12,9 @@ let contestResultJson = null;
 let nextContestName = null;
 
 function myFunction() {
-    clearCachedSession();
-    helper();
+    // clearCachedSession();
+    // helper();
+    notifyDiscordLastContestResult();
 }
 
 /*
@@ -37,6 +38,24 @@ function getLastContestName() {
     lastContestName = CONTEST_SHEET.getRange("B2").getValue();
     CACHE_SERVICE.put(LAST_CONTEST_CACHE_NAME, lastContestName, 3600);
     return lastContestName;
+}
+
+// FOR DEBUGGING
+function notifyDiscordLastContestResult() {
+    assignContestSheet();
+    const lastContestName = getLastContestName();
+    console.log(`Last contest: ${lastContestName}`)
+
+
+    const fixed = isContestFixed(lastContestName);
+    if (!fixed) {
+        console.error("Last contest result is NOT fixed.");
+        return;
+    }
+
+    // `nextContestName` is used just for notification in `notifyInDiscord`
+    nextContestName = lastContestName;
+    notifyInDiscord();
 }
 
 // Actual logic
@@ -107,6 +126,7 @@ function isContestFixed(contestName) {
     contestResultJson = JSON.parse(htmlText);
 
     const resultLength = contestResultJson.length;
+    console.log(`Contest result length: ${resultLength}`);
     if (typeof (resultLength) !== "number") {
         console.error("Contest result JSON is not an array.");
         console.log(`contestResultJson: ${contestResultJson}`);
@@ -267,12 +287,19 @@ function notifyInDiscord() {
     const contestURLMarkdown = `[${upperContestName}](${contestURL})`;
     let msg = `[${contestURLMarkdown}]`;
 
+    console.log(`Notifying Discord for ${nextContestName}...`)
+
     // Author & his friends
     const discordUsers = new Set(["k1832", "maeda__1221", " oirom0528"]);
     let participated = false;
     for (let i = 0; (i < contestResultJson.length) && (discordUsers.size > 0); ++i) {
         const userScreenName = contestResultJson[i].UserScreenName;
         if (!discordUsers.has(userScreenName)) continue;
+
+        console.log(`Found user: ${userScreenName}`)
+
+        // TODO(k1832): Remove this. Just for debugging.
+        console.log(`JSON: ${JSON.stringify(contestResultJson[i])}`)
 
         discordUsers.delete(userScreenName);
 
