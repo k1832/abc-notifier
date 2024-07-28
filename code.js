@@ -7,14 +7,23 @@ const SESSION_COOKIE_CACHE_NAME = 'sessionCookie';
 // TODO(k1832): Consider caching next contest name instead of last
 const LAST_CONTEST_CACHE_NAME = 'contestName';
 
-let contestResultJson = null;
-
-let nextContestName = null;
+const JSON_LENGTH_RANGE = "C2";
+const RATE_UPDATED_RANGE = "D2";
 
 function myFunction() {
+    helper();
+    // assignContestSheet();
+    // const flag = CONTEST_SHEET.getRange(RATE_UPDATED_RANGE).getValue();
+    // if (flag === true) {
+    //     console.log('true');
+    // } else if (flag === false) {
+    //     console.log('false');
+    // } else {
+    //     console.log('else');
+    // }
     // clearCachedSession();
     // helper();
-    notifyDiscordLastContestResult();
+    // notifyDiscordLastContestResult();
 }
 
 /*
@@ -40,52 +49,78 @@ function getLastContestName() {
     return lastContestName;
 }
 
-// FOR DEBUGGING
-function notifyDiscordLastContestResult() {
-    assignContestSheet();
-    const lastContestName = getLastContestName();
-    console.log(`Last contest: ${lastContestName}`)
-
-
-    const fixed = isContestFixed(lastContestName);
-    if (!fixed) {
-        console.error("Last contest result is NOT fixed.");
-        return;
-    }
-
-    // `nextContestName` is used just for notification in `notifyInDiscord`
-    nextContestName = lastContestName;
-    notifyInDiscord();
-}
-
 // Actual logic
+// This function does 2 things
+// - Check if the next contest result is fixed. If yes, notify in various ways (X, Discord, LINE).
+//     "contest result is fixed" means that all users' rates are updated.
+//     But this does NOT mean that all users' rate changes are included
+//     in the contest result JSON.
+// - Check if the result JSON (of the last-fixed contest) is completely updated. If yes, notify rate changes in Discord.
 function helper() {
     assignContestSheet();
     const lastContestName = getLastContestName();
     const lastContestNumber = parseInt(lastContestName.substr(3));
-    nextContestName = `abc${lastContestNumber + 1}`;
+    const nextContestName = `abc${lastContestNumber + 1}`;
     console.log(`Next contest: ${nextContestName}`)
 
     const TRIAL_COUNT = 2;
     for (let i = 1; i <= TRIAL_COUNT; ++i) {
-        const fixed = isContestFixed(nextContestName);
-
-        if (fixed === true) {
-            updateSheetAndNotify();
-            console.log("Contest result is fixed.");
-            return;
+        const sessionCookie = loginAndGetSessionCookie();
+        if (sessionCookie === null) {
+            console.error("Something went wrong while getting the session cookie.");
+            return null;
         }
 
-        if (fixed === false) {
-            console.log("Contest result is NOT fixed.");
-            return;
-        }
-
-        console.error("Something's wrong!!");
-        if (i + 1 <= TRIAL_COUNT) {
+        const contestResultJson = getContestResultJSON(nextContestName, sessionCookie);
+        if (contestResultJson === null) {
+            console.error(`Failed to get the contest result JSON for ${nextContestName}.`);
             console.log(`Retrying.. ${i + 1} / ${TRIAL_COUNT}`);
             Utilities.sleep(3000);
+            continue;
         }
+
+        if (isContestFixed(contestResultJson)) {
+            console.log("Contest result is fixed.");
+            updateSheetAndNotify(nextContestName);
+
+            // It's a first check of the rate update for the contest.
+            // So just record the JSON length (which should be greater than 0) and return,
+            // as it might be in the middle of the JSON update.
+            addContestJSONLengthAndFlagIntoSheet(contestResultJson.length, false);
+            return;
+        } else {
+            console.log(`Contest result is not fixed yet for ${nextContestName}.`);
+        }
+
+        // The next contest result is not fixed
+
+        // But need to check if the rate for the last contest is updated.
+        if (isRateUpdatedForLastFixedContest()) {
+            console.log(`Rate is already updated for ${lastContestName}.`);
+            return;
+        }
+
+        const lastContestResultJson = getContestResultJSON(lastContestName, sessionCookie);
+        if (contestResultJson === null) {
+            console.error(`Failed to get the contest result JSON for ${lastContestName}.`);
+            console.log(`Retrying.. ${i + 1} / ${TRIAL_COUNT}`);
+            Utilities.sleep(3000);
+            continue;
+        }
+
+        previousJsonLength = getJSONLengthForLastFixedContest();
+        if (lastContestResultJson.length === previousJsonLength) {
+            // `previousJsonLength` must be greater than 0.
+            // If the JSON length is not changing anymore, we consider it's completely updated.
+            console.log("Result JSON update is done. Starting to notify rate changes.")
+            addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, true);
+            notifyNewRateInDiscord(lastContestResultJson, lastContestName);
+        } else {
+            // JSON is still being updated.
+            addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, false);
+        }
+        // No need to retry at this point. Just return.
+        return;
     }
 
     throw new Error("Failed to get contest data.");
@@ -98,13 +133,7 @@ function notifyIfContestFixed() {
     }
 }
 
-function isContestFixed(contestName) {
-    const sessionCookie = loginAndGetSessionCookie();
-    if (sessionCookie === null) {
-        console.error("Something went wrong while getting the session cookie.");
-        return null;
-    }
-
+function getContestResultJSON(contestName, sessionCookie) {
     const options = {
         muteHttpExceptions: true,
         headers: {
@@ -123,17 +152,11 @@ function isContestFixed(contestName) {
     }
 
     const htmlText = response.getContentText();
-    contestResultJson = JSON.parse(htmlText);
+    return JSON.parse(htmlText);
+}
 
-    const resultLength = contestResultJson.length;
-    console.log(`Contest result length: ${resultLength}`);
-    if (typeof (resultLength) !== "number") {
-        console.error("Contest result JSON is not an array.");
-        console.log(`contestResultJson: ${contestResultJson}`);
-        return null;
-    }
-
-    return resultLength > 0;
+function isContestFixed(contestResultJson) {
+    return contestResultJson.length > 0;
 }
 
 function decodeHtmlEntities(str) {
@@ -270,24 +293,41 @@ function inTimeRange() {
     return false;
 }
 
-function addNextContestIntoSheet() {
+function addFixedContestNameIntoSheet(contestName) {
     assignContestSheet();
     CONTEST_SHEET.insertRowBefore(2);
-    CONTEST_SHEET.getRange("A2:B2").setValues([[new Date(), nextContestName]]);
-    console.log(`${nextContestName} is added to the sheet.`)
+    CONTEST_SHEET.getRange("A2:B2").setValues([[new Date(), contestName]]);
+    console.log(`${contestName} is added to the sheet as a fixed contest.`)
 
     assignCacheService();
-    CACHE_SERVICE.put(LAST_CONTEST_CACHE_NAME, nextContestName, 3600);
+    CACHE_SERVICE.put(LAST_CONTEST_CACHE_NAME, contestName, 3600);
 }
 
-function notifyInDiscord() {
-    const atcoderBaseURL = "https://atcoder.jp";
-    const contestURL = `${atcoderBaseURL}/contests/${nextContestName}`;
-    const upperContestName = nextContestName.toUpperCase();
-    const contestURLMarkdown = `[${upperContestName}](${contestURL})`;
-    let msg = `[${contestURLMarkdown}]`;
+function getJSONLengthForLastFixedContest() {
+    assignContestSheet();
+    return CONTEST_SHEET.getRange(JSON_LENGTH_RANGE).getValue();
+}
 
-    console.log(`Notifying Discord for ${nextContestName}...`)
+function isRateUpdatedForLastFixedContest() {
+    assignContestSheet();
+    return CONTEST_SHEET.getRange(RATE_UPDATED_RANGE).getValue();
+}
+
+function addContestJSONLengthAndFlagIntoSheet(jsonLength, isRateUpdated) {
+    assignContestSheet();
+    CONTEST_SHEET.getRange(JSON_LENGTH_RANGE).setValue(jsonLength);
+    CONTEST_SHEET.getRange(RATE_UPDATED_RANGE).setValue(isRateUpdated);
+}
+
+/**
+ * Notify rate changes to users. (This function assumes the result JSON is completely updated.)
+ */
+function notifyNewRateInDiscord(contestResultJson, contestName) {
+    const atcoderBaseURL = "https://atcoder.jp";
+    const contestURL = `${atcoderBaseURL}/contests/${contestName}`;
+    const upperContestName = contestName.toUpperCase();
+    const contestURLMarkdown = `[${upperContestName}](${contestURL})`;
+    let msg = `[${contestURLMarkdown}後のレート変化]`;
 
     // Author & his friends
     const discordUsers = new Set(["k1832", "maeda__1221", " oirom0528"]);
@@ -297,10 +337,6 @@ function notifyInDiscord() {
         if (!discordUsers.has(userScreenName)) continue;
 
         console.log(`Found user: ${userScreenName}`)
-
-        // TODO(k1832): Remove this. Just for debugging.
-        console.log(`JSON: ${JSON.stringify(contestResultJson[i])}`)
-
         discordUsers.delete(userScreenName);
 
         const userPageURL = `${atcoderBaseURL}/users/${userScreenName}`;
@@ -345,9 +381,9 @@ function notifyInDiscord() {
     sendMsgDiscord(msg);
 }
 
-function updateSheetAndNotify() {
-    const contestURL = `https://atcoder.jp/contests/${nextContestName}`;
-    let msg = `${nextContestName.toUpperCase()}の結果が更新されました。\n${contestURL}`;
+function updateSheetAndNotify(contestName) {
+    const contestURL = `https://atcoder.jp/contests/${contestName}`;
+    let msg = `${contestName.toUpperCase()}の結果が更新されました。\n${contestURL}`;
 
     try {
         sendTweet(msg);
@@ -360,13 +396,8 @@ function updateSheetAndNotify() {
         "DEBUG_GROUP_ID"
     );
     sendMessages([msg], DEBUG_GROUP_ID);
-    addNextContestIntoSheet();
-
-    /*
-     * Low priority. Should be at the end of the function
-     * to avoid disturbing other notifications.
-     */
-    notifyInDiscord();
+    sendMsgDiscord(msg);
+    addFixedContestNameIntoSheet(contestName);
 }
 
 
