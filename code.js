@@ -279,13 +279,11 @@ function inTimeRange() {
 
     if (hours < 10 && [0, 1, 6].includes(day)) {
         // Morning
-        console.log("It's in time range.");
         return true;
     }
 
     if (hours >= 19 && [0, 5, 6].includes(day)) {
         // Evening
-        console.log("It's in time range.");
         return true;
     }
 
