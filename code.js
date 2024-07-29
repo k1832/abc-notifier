@@ -175,7 +175,6 @@ function loginAndGetSessionCookie() {
     assignCacheService();
     const cachedSessionCookie = CACHE_SERVICE.get(SESSION_COOKIE_CACHE_NAME);
     if (cachedSessionCookie) {
-        console.log("Found cached session cookie!");
         return cachedSessionCookie;
     }
 
