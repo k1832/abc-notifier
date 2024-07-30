@@ -49,6 +49,27 @@ function getLastContestName() {
     return lastContestName;
 }
 
+// TODO(k1832): Remove this. Just for debugging
+function print_debug_info(contestResultJson) {
+    console.log("Printing part of contestResultJson for debugging..")
+    console.log(`Length: ${len(contestResultJson)}`)
+    const NUM_USERS_TO_SHOW = 5
+    console.log(`First ${NUM_USERS_TO_SHOW} users`)
+    console.log('---------------------------------')
+    for (let i = 0; i < NUM_USERS_TO_SHOW; ++i) {
+        console.log(contestResultJson[i]);
+    }
+    console.log('---------------------------------')
+
+    console.log(`Last ${NUM_USERS_TO_SHOW} users`)
+    console.log('---------------------------------')
+    for (let di = 0; di < NUM_USERS_TO_SHOW; ++di) {
+        const i = len(contestResultJson) - 1 - di;
+        console.log(contestResultJson[i]);
+    }
+    console.log('---------------------------------')
+}
+
 // Actual logic
 // This function does 2 things
 // - Check if the next contest result is fixed. If yes, notify in various ways (X, Discord, LINE).
@@ -87,6 +108,9 @@ function helper() {
             // So just record the JSON length (which should be greater than 0) and return,
             // as it might be in the middle of the JSON update.
             addContestJSONLengthAndFlagIntoSheet(contestResultJson.length, false);
+
+            // TODO(k1832): Remove this. Just for debugging.
+            print_debug_info(contestResultJson);
             return;
         } else {
             console.log(`Contest result is not fixed yet for ${nextContestName}.`);
@@ -96,7 +120,7 @@ function helper() {
 
         // But need to check if the rate for the last contest is updated.
         if (isRateUpdatedForLastFixedContest()) {
-            console.log(`Rate is already updated for ${lastContestName}.`);
+            console.log(`Rate changes have been already notified for ${lastContestName}.`);
             return;
         }
 
@@ -112,9 +136,12 @@ function helper() {
         if (lastContestResultJson.length === previousJsonLength) {
             // `previousJsonLength` must be greater than 0.
             // If the JSON length is not changing anymore, we consider it's completely updated.
-            console.log("Result JSON update is done. Starting to notify rate changes.")
+            console.log(`Ready to notify rate changes for ${lastContestName}.`)
             addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, true);
             notifyNewRateInDiscord(lastContestResultJson, lastContestName);
+
+            // TODO(k1832): Remove this. Just for debugging.
+            print_debug_info(contestResultJson);
         } else {
             // JSON is still being updated.
             addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, false);
