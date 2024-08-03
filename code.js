@@ -52,7 +52,7 @@ function getLastContestName() {
 // TODO(k1832): Remove this. Just for debugging
 function print_debug_info(contestResultJson) {
     console.log("Printing part of contestResultJson for debugging..")
-    console.log(`Length: ${len(contestResultJson)}`)
+    console.log(`Length: ${contestResultJson.length}`)
     const NUM_USERS_TO_SHOW = 5
     console.log(`First ${NUM_USERS_TO_SHOW} users`)
     console.log('---------------------------------')
@@ -64,7 +64,7 @@ function print_debug_info(contestResultJson) {
     console.log(`Last ${NUM_USERS_TO_SHOW} users`)
     console.log('---------------------------------')
     for (let di = 0; di < NUM_USERS_TO_SHOW; ++di) {
-        const i = len(contestResultJson) - 1 - di;
+        const i = contestResultJson.length - 1 - di;
         console.log(contestResultJson[i]);
     }
     console.log('---------------------------------')
