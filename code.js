@@ -52,7 +52,6 @@ function getLastContestName() {
 // TODO(k1832): Remove this. Just for debugging
 function print_debug_info(contestResultJson) {
     console.log("Printing part of contestResultJson for debugging..")
-    console.log(`Length: ${contestResultJson.length}`)
     const NUM_USERS_TO_SHOW = 5
     console.log(`First ${NUM_USERS_TO_SHOW} users`)
     console.log('---------------------------------')
@@ -99,6 +98,7 @@ function helper() {
             Utilities.sleep(3000);
             continue;
         }
+        console.log(`Length of the contest ${nextContestName} result is ${contestResultJson.length}`)
 
         if (isContestFixed(contestResultJson)) {
             console.log("Contest result is fixed.");
@@ -125,12 +125,13 @@ function helper() {
         }
 
         const lastContestResultJson = getContestResultJSON(lastContestName, sessionCookie);
-        if (contestResultJson === null) {
+        if (lastContestResultJson === null) {
             console.error(`Failed to get the contest result JSON for ${lastContestName}.`);
             console.log(`Retrying.. ${i + 1} / ${TRIAL_COUNT}`);
             Utilities.sleep(3000);
             continue;
         }
+        console.log(`Length of the contest ${lastContestName} result is ${lastContestResultJson.length}`)
 
         previousJsonLength = getJSONLengthForLastFixedContest();
         if (lastContestResultJson.length === previousJsonLength) {
@@ -141,7 +142,7 @@ function helper() {
             notifyNewRateInDiscord(lastContestResultJson, lastContestName);
 
             // TODO(k1832): Remove this. Just for debugging.
-            print_debug_info(contestResultJson);
+            print_debug_info(lastContestResultJson);
         } else {
             // JSON is still being updated.
             addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, false);
