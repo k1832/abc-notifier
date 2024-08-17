@@ -4,7 +4,6 @@ let CACHE_SERVICE = null;
 
 // Cache names
 const SESSION_COOKIE_CACHE_NAME = 'sessionCookie';
-// TODO(k1832): Consider caching next contest name instead of last
 const LAST_CONTEST_CACHE_NAME = 'contestName';
 
 const JSON_LENGTH_RANGE = "C2";
@@ -49,26 +48,6 @@ function getLastContestName() {
     return lastContestName;
 }
 
-// TODO(k1832): Remove this. Just for debugging
-function print_debug_info(contestResultJson) {
-    console.log("Printing part of contestResultJson for debugging..")
-    const NUM_USERS_TO_SHOW = 5
-    console.log(`First ${NUM_USERS_TO_SHOW} users`)
-    console.log('---------------------------------')
-    for (let i = 0; i < NUM_USERS_TO_SHOW; ++i) {
-        console.log(contestResultJson[i]);
-    }
-    console.log('---------------------------------')
-
-    console.log(`Last ${NUM_USERS_TO_SHOW} users`)
-    console.log('---------------------------------')
-    for (let di = 0; di < NUM_USERS_TO_SHOW; ++di) {
-        const i = contestResultJson.length - 1 - di;
-        console.log(contestResultJson[i]);
-    }
-    console.log('---------------------------------')
-}
-
 // Actual logic
 // This function does 2 things
 // - Check if the next contest result is fixed. If yes, notify in various ways (X, Discord, LINE).
@@ -108,9 +87,6 @@ function helper() {
             // So just record the JSON length (which should be greater than 0) and return,
             // as it might be in the middle of the JSON update.
             addContestJSONLengthAndFlagIntoSheet(contestResultJson.length, false);
-
-            // TODO(k1832): Remove this. Just for debugging.
-            print_debug_info(contestResultJson);
             return;
         } else {
             console.log(`Contest result is not fixed yet for ${nextContestName}.`);
@@ -140,9 +116,6 @@ function helper() {
             console.log(`Ready to notify rate changes for ${lastContestName}.`)
             addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, true);
             notifyNewRateInDiscord(lastContestResultJson, lastContestName);
-
-            // TODO(k1832): Remove this. Just for debugging.
-            print_debug_info(lastContestResultJson);
         } else {
             // JSON is still being updated.
             addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, false);
@@ -158,6 +131,8 @@ function notifyIfContestFixed() {
     // Call the main logic only if it's in time range
     if (inTimeRange()) {
         helper();
+    } else {
+        console.log("Not in time range.");
     }
 }
 
@@ -293,29 +268,26 @@ function assignContestSheet() {
 
 function inTimeRange() {
     const now = new Date();
+
+    // 0   1   2   3   4   5   6
+    // Sun Mon Tue Wed Thu Fri Sat
     const day = now.getDay();
-
-    // 0   1   [2   3   4  ] 5   6
-    // Sun Mon [Tue Wed Thu] Fri Sat
-    if ([2, 3, 4].includes(day)) {
-        console.log("It's NOT in time range.");
-        return false;
-    }
-
     const hours = now.getHours();
 
-    if (hours < 10 && [0, 1, 6].includes(day)) {
-        // Morning
-        return true;
-    }
+    // Assuming contests are on Fri-Sun
 
-    if (hours >= 19 && [0, 5, 6].includes(day)) {
-        // Evening
-        return true;
+    if (day === 0 || day === 6) {
+        // Sun or Sat
+        return hours < 10 || hours >= 19; // Morning or evening
+    } else if (day === 1) {
+        // Mon
+        return hours < 10; // Morning
+    } else if (day === 5) {
+        // Fri
+        return hours >= 19; // Evening
+    } else {
+        return false;
     }
-
-    console.log("It's NOT in time range.");
-    return false;
 }
 
 function addFixedContestNameIntoSheet(contestName) {
