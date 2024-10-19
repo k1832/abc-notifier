@@ -327,7 +327,7 @@ function notifyNewRateInDiscord(contestResultJson, contestName) {
     let msg = `[${contestURLMarkdown}後のレート変化]`;
 
     // Author & his friends
-    const discordUsers = new Set(["k1832", "maeda__1221", " oirom0528"]);
+    const discordUsers = new Set(["k1832", "maeda__1221", "oirom0528"]);
     let participated = false;
     for (let i = 0; (i < contestResultJson.length) && (discordUsers.size > 0); ++i) {
         const userScreenName = contestResultJson[i].UserScreenName;
