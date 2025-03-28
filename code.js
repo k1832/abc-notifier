@@ -9,6 +9,7 @@ const LAST_CONTEST_CACHE_NAME = 'contestName';
 const JSON_LENGTH_RANGE = "C2";
 const RATE_UPDATED_RANGE = "D2";
 
+
 function myFunction() {
     helper();
     // assignContestSheet();
@@ -28,6 +29,52 @@ function myFunction() {
 /*
  * Updated version with login
  */
+
+/**
+ * Parses the hardcoded session cookie to extract the expiry timestamp.
+ * @returns {number|null} The Unix timestamp (in seconds) of expiry, or null if not found/invalid.
+ */
+function getSessionExpiryTimestamp() {
+    const ATCODER_SESSION =
+        PropertiesService.getScriptProperties().getProperty("ATCODER_SESSION");
+    try {
+        // Ensure the cookie variable is accessible
+        if (!ATCODER_SESSION || typeof ATCODER_SESSION !== 'string') {
+            console.error("Hardcoded session cookie is not defined or not a string.");
+            return null;
+        }
+
+        // Find the _TS part
+        const tsRegex = /_TS%3A(\d+)/; // Use regex to find _TS: followed by digits
+        const match = ATCODER_SESSION.match(tsRegex);
+
+        if (match && match[1]) {
+            const timestampSeconds = parseInt(match[1], 10);
+            if (!isNaN(timestampSeconds)) {
+                return timestampSeconds;
+            } else {
+                 console.error("Failed to parse timestamp value from session cookie.");
+                 return null;
+            }
+        } else {
+            console.error("Could not find '_TS:' timestamp in the hardcoded session cookie.");
+            return null;
+        }
+    } catch (e) {
+        console.error("Error parsing session cookie timestamp: " + e);
+        return null;
+    }
+}
+
+function getFormattedSessionExpiryDate() {
+    const expiryTimestampSeconds = getSessionExpiryTimestamp();
+    if (!expiryTimestampSeconds) return null;
+
+    const expiryDate = new Date(expiryTimestampSeconds * 1000);
+    const scriptTimeZone = Session.getScriptTimeZone(); // Get script's timezone for formatting
+    const formattedExpiryDate = Utilities.formatDate(expiryDate, scriptTimeZone, "yyyy-MM-dd HH:mm:ss z");
+    return formattedExpiryDate;
+}
 
 function assignCacheService() {
     if (CACHE_SERVICE) return;
@@ -62,19 +109,27 @@ function helper() {
     const nextContestName = `abc${lastContestNumber + 1}`;
     console.log(`Next contest: ${nextContestName}`)
 
+    const SLEEP_DURATION = 1000;
+
     const TRIAL_COUNT = 2;
     for (let i = 1; i <= TRIAL_COUNT; ++i) {
         const sessionCookie = loginAndGetSessionCookie();
         if (sessionCookie === null) {
             console.error("Something went wrong while getting the session cookie.");
-            return null;
+            if (i + 1 <= TRIAL_COUNT) {
+                console.log(`Sleeping for ${SLEEP_DURATION}ms before retrying`);
+                Utilities.sleep(SLEEP_DURATION);
+            }
+            continue;
         }
 
         const contestResultJson = getContestResultJSON(nextContestName, sessionCookie);
         if (contestResultJson === null) {
             console.error(`Failed to get the contest result JSON for ${nextContestName}.`);
-            console.log(`Retrying.. ${i + 1} / ${TRIAL_COUNT}`);
-            Utilities.sleep(3000);
+            if (i + 1 <= TRIAL_COUNT) {
+                console.log(`Sleeping for ${SLEEP_DURATION} ms before retrying`);
+                Utilities.sleep(SLEEP_DURATION);
+            }
             continue;
         }
         console.log(`Length of the contest ${nextContestName} result is ${contestResultJson.length}`)
@@ -103,8 +158,10 @@ function helper() {
         const lastContestResultJson = getContestResultJSON(lastContestName, sessionCookie);
         if (lastContestResultJson === null) {
             console.error(`Failed to get the contest result JSON for ${lastContestName}.`);
-            console.log(`Retrying.. ${i + 1} / ${TRIAL_COUNT}`);
-            Utilities.sleep(3000);
+            if (i + 1 <= TRIAL_COUNT) {
+                console.log(`Sleeping for ${SLEEP_DURATION}ms before retrying`);
+                Utilities.sleep(SLEEP_DURATION);
+            }
             continue;
         }
         console.log(`Length of the contest ${lastContestName} result is ${lastContestResultJson.length}`)
@@ -147,6 +204,7 @@ function getContestResultJSON(contestName, sessionCookie) {
 
     const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/results/json`;
     const response = UrlFetchApp.fetch(contestStandingUrl, options);
+
     if (response.getResponseCode() !== 200) {
         console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
         console.log("HTML content:")
@@ -175,6 +233,14 @@ function clearCachedSession() {
 
 /* This function caches the session */
 function loginAndGetSessionCookie() {
+    // HACK: Use the hardcoded session because AtCoder changed
+    //       how to login.
+
+    // Value of REVEL_SESSION (the prefix "REVEL_SESSION=" is not needed)
+    const ATCODER_SESSION =
+        PropertiesService.getScriptProperties().getProperty("ATCODER_SESSION");
+    return ATCODER_SESSION;
+
     assignCacheService();
     const cachedSessionCookie = CACHE_SERVICE.get(SESSION_COOKIE_CACHE_NAME);
     if (cachedSessionCookie) {
@@ -375,6 +441,14 @@ function notifyNewRateInDiscord(contestResultJson, contestName) {
     if (!participated) {
         msg += "\n誰もRatedで参加しなかったようだ👎";
     }
+
+    const sessionExpiryDate = getFormattedSessionExpiryDate();
+    if (sessionExpiryDate) {
+        msg += `\nデバッグ情報: Next session expiry: ${getFormattedSessionExpiryDate()}`;
+    } else {
+        msg += `\nデバッグ情報: Failed to get session expiry date.`;
+    }
+
     sendMsgDiscord(msg);
 }
 
