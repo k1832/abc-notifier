@@ -95,6 +95,42 @@ function getLastContestName() {
     return lastContestName;
 }
 
+/**
+ * Check if the account session is still valid.
+ *
+ * If not, report it to LINE and Discord.
+ */
+function healthCheck() {
+    const MSG = "The AtCoder session may be expired!\n" +
+                "Please update it and test the script!";
+    const TEST_CONTEST = "abc389";
+
+    const session = loginAndGetSessionCookie();
+    if (session === null) {
+        console.error("Something went wrong while getting the session cookie.");
+        sendMessagesLINE([MSG], DEBUG_GROUP_ID);
+        sendMsgDiscord(MSG);
+        return;
+    }
+
+    const contestResultJson = getContestResultJSON(TEST_CONTEST, session);
+    if (contestResultJson === null) {
+        console.error(`Failed to get the contest result JSON for ${TEST_CONTEST}.`);
+        sendMessagesLINE([MSG], DEBUG_GROUP_ID);
+        sendMsgDiscord(MSG);
+        return;
+    }
+
+    if (contestResultJson.length === 0) {
+        console.error(`JSON's length for ${TEST_CONTEST} is 0. Something went wrong?`);
+        sendMessagesLINE([MSG], DEBUG_GROUP_ID);
+        sendMsgDiscord(MSG);
+        return;
+    }
+    console.log(`Result length for ${TEST_CONTEST}: ${contestResultJson.length}`);
+    console.log("Session seems still valid!");
+}
+
 // Actual logic
 // This function does 2 things
 // - Check if the next contest result is fixed. If yes, notify in various ways (X, Discord, LINE).
@@ -132,7 +168,7 @@ function helper() {
             }
             continue;
         }
-        console.log(`Length of the contest ${nextContestName} result is ${contestResultJson.length}`)
+        console.log(`Length of the contest ${nextContestName} result is ${contestResultJson.length}`);
 
         if (isContestFixed(contestResultJson)) {
             console.log("Contest result is fixed.");
@@ -164,13 +200,13 @@ function helper() {
             }
             continue;
         }
-        console.log(`Length of the contest ${lastContestName} result is ${lastContestResultJson.length}`)
+        console.log(`Length of the contest ${lastContestName} result is ${lastContestResultJson.length}`);
 
         previousJsonLength = getJSONLengthForLastFixedContest();
         if (lastContestResultJson.length === previousJsonLength) {
             // `previousJsonLength` must be greater than 0.
             // If the JSON length is not changing anymore, we consider it's completely updated.
-            console.log(`Ready to notify rate changes for ${lastContestName}.`)
+            console.log(`Ready to notify rate changes for ${lastContestName}.`);
             addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, true);
             notifyNewRateInDiscord(lastContestResultJson, lastContestName);
         } else {
@@ -194,6 +230,8 @@ function notifyIfContestFixed() {
 }
 
 function getContestResultJSON(contestName, sessionCookie) {
+    // Maybe session is not needed anymore???
+    // `curl https://atcoder.jp/contests/abc388/results/json` returned the result!
     const options = {
         muteHttpExceptions: true,
         headers: {
@@ -207,7 +245,7 @@ function getContestResultJSON(contestName, sessionCookie) {
 
     if (response.getResponseCode() !== 200) {
         console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
-        console.log("HTML content:")
+        console.log("HTML content:");
         console.log(response.getContentText("UTF-8"));
         return null;
     }
@@ -466,14 +504,14 @@ function updateSheetAndNotify(contestName) {
     const DEBUG_GROUP_ID = PropertiesService.getScriptProperties().getProperty(
         "DEBUG_GROUP_ID"
     );
-    sendMessages([msg], DEBUG_GROUP_ID);
+    sendMessagesLINE([msg], DEBUG_GROUP_ID);
     sendMsgDiscord(msg);
     addFixedContestNameIntoSheet(contestName);
 }
 
 
 /*** LINE API ***/
-function sendMessages(messageList, destId) {
+function sendMessagesLINE(messageList, destId) {
     if (!messageList.length) return;
 
     const url = "https://api.line.me/v2/bot/message/push";
