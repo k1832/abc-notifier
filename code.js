@@ -11,7 +11,7 @@ const RATE_UPDATED_RANGE = "D2";
 
 
 function myFunction() {
-    helper();
+    // helper();
     // assignContestSheet();
     // const flag = CONTEST_SHEET.getRange(RATE_UPDATED_RANGE).getValue();
     // if (flag === true) {
