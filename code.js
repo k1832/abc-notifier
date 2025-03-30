@@ -108,7 +108,7 @@ function healthCheck() {
     const session = loginAndGetSessionCookie();
     if (session === null) {
         console.error("Something went wrong while getting the session cookie.");
-        sendMessagesLINE([MSG], DEBUG_GROUP_ID);
+        sendMessagesLINE([MSG]);
         sendMsgDiscord(MSG);
         return;
     }
@@ -116,14 +116,14 @@ function healthCheck() {
     const contestResultJson = getContestResultJSON(TEST_CONTEST, session);
     if (contestResultJson === null) {
         console.error(`Failed to get the contest result JSON for ${TEST_CONTEST}.`);
-        sendMessagesLINE([MSG], DEBUG_GROUP_ID);
+        sendMessagesLINE([MSG]);
         sendMsgDiscord(MSG);
         return;
     }
 
     if (contestResultJson.length === 0) {
         console.error(`JSON's length for ${TEST_CONTEST} is 0. Something went wrong?`);
-        sendMessagesLINE([MSG], DEBUG_GROUP_ID);
+        sendMessagesLINE([MSG]);
         sendMsgDiscord(MSG);
         return;
     }
@@ -501,17 +501,14 @@ function updateSheetAndNotify(contestName) {
         console.error("Failed to tweet.");
     }
 
-    const DEBUG_GROUP_ID = PropertiesService.getScriptProperties().getProperty(
-        "DEBUG_GROUP_ID"
-    );
-    sendMessagesLINE([msg], DEBUG_GROUP_ID);
+    sendMessagesLINE([msg]);
     sendMsgDiscord(msg);
     addFixedContestNameIntoSheet(contestName);
 }
 
 
 /*** LINE API ***/
-function sendMessagesLINE(messageList, destId) {
+function sendMessagesLINEWithDest(messageList, destId) {
     if (!messageList.length) return;
 
     const url = "https://api.line.me/v2/bot/message/push";
@@ -534,6 +531,12 @@ function sendMessagesLINE(messageList, destId) {
     UrlFetchApp.fetch(url, options);
 }
 
+function sendMessagesLINE(messageList) {
+    const DEBUG_GROUP_ID = PropertiesService.getScriptProperties().getProperty(
+        "DEBUG_GROUP_ID"
+    );
+    sendMessagesLINEWithDest(messageList, DEBUG_GROUP_ID);
+}
 
 /*** Twitter API ***/
 // https://tech-cci.io/archives/4228
