@@ -53,8 +53,8 @@ function getSessionExpiryTimestamp() {
             if (!isNaN(timestampSeconds)) {
                 return timestampSeconds;
             } else {
-                 console.error("Failed to parse timestamp value from session cookie.");
-                 return null;
+                console.error("Failed to parse timestamp value from session cookie.");
+                return null;
             }
         } else {
             console.error("Could not find '_TS:' timestamp in the hardcoded session cookie.");
@@ -101,8 +101,9 @@ function getLastContestName() {
  * If not, report it to LINE and Discord.
  */
 function healthCheck() {
-    const MSG = "The AtCoder session may be expired!\n" +
-                "Please update it and test the script!";
+    const MSG =
+        "The AtCoder session may be expired!\n" +
+        "Please update it and test the script!";
     const TEST_CONTEST = "abc389";
 
     const session = loginAndGetSessionCookie();
