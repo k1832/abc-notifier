@@ -131,6 +131,24 @@ function healthCheck() {
     console.log("Session seems still valid!");
 }
 
+function noLoginTest() {
+    assignContestSheet();
+    const lastContestName = getLastContestName();
+    const lastContestNumber = parseInt(lastContestName.substr(3));
+    const nextContestName = `abc${lastContestNumber + 1}`;
+
+    const contestResultJson = getContestResultJSONNoLogin(nextContestName);
+    if (contestResultJson === null) {
+        const msg = `Couldn't get JSON without logging in for ${nextContestName}`;
+        sendMessagesLINE([msg]);
+    } else {
+        const msg = `Got JSON without logging in for ${nextContestName} with length ${contestResultJson.length}`;
+
+        // Print it as a log instead of a LINE msg
+        console.log(msg);
+    }
+}
+
 // Actual logic
 // This function does 2 things
 // - Check if the next contest result is fixed. If yes, notify in various ways (X, Discord, LINE).
@@ -242,6 +260,21 @@ function getContestResultJSON(contestName, sessionCookie) {
 
     const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/results/json`;
     const response = UrlFetchApp.fetch(contestStandingUrl, options);
+
+    if (response.getResponseCode() !== 200) {
+        console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
+        console.log("HTML content:");
+        console.log(response.getContentText("UTF-8"));
+        return null;
+    }
+
+    const htmlText = response.getContentText();
+    return JSON.parse(htmlText);
+}
+
+function getContestResultJSONNoLogin(contestName) {
+    const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/results/json`;
+    const response = UrlFetchApp.fetch(contestStandingUrl);
 
     if (response.getResponseCode() !== 200) {
         console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
