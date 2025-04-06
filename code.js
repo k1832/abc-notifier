@@ -57,7 +57,7 @@ function healthCheck() {
 
     const contestResultJson = getContestResultJSONNoLogin(TEST_CONTEST);
     if (contestResultJson === null) {
-        console.error(`Failed to get the contest result JSON for ${TEST_CONTEST}.`);
+        console.error(`[${TEST_CONTEST}] Failed to get the result JSON`);
         sendMessagesLINE([MSG]);
         sendMsgDiscord(MSG);
         return;
@@ -65,7 +65,7 @@ function healthCheck() {
 
     try {
         if (contestResultJson.length !== EXPECTED_JSON_LEN) {
-            const err_msg = `JSON's length is expected to be ${EXPECTED_JSON_LEN}, but got ${contestResultJson.length}.`
+            const err_msg = `[${TEST_CONTEST}] JSON's length:\n\texpected: ${EXPECTED_JSON_LEN}, actual: ${contestResultJson.length}`
             console.error(err_msg);
             sendMessagesLINE([MSG]);
             sendMsgDiscord(MSG);
@@ -78,7 +78,7 @@ function healthCheck() {
         return;
     }
 
-    console.log(`Result length for ${TEST_CONTEST}: ${contestResultJson.length}`);
+    console.log(`[${TEST_CONTEST}] Result length: ${contestResultJson.length}`);
     console.log("Health check passed.");
 }
 
@@ -98,13 +98,13 @@ function helper() {
 
     const contestResultJson = getContestResultJSONNoLogin(nextContestName);
     if (contestResultJson === null) {
-        console.error(`Failed to get the contest result JSON for ${nextContestName}.`);
+        console.error(`[${nextContestName}] Failed to get the result JSON`);
         return;
     }
-    console.log(`JSON length for ${nextContestName}: ${contestResultJson.length}`);
+    console.log(`[${nextContestName}] JSON length: ${contestResultJson.length}`);
 
     if (isContestResultFixed(contestResultJson)) {
-        console.log("Contest result is fixed.");
+        console.log(`[${nextContestName}] Contest result is fixed`);
         updateSheetAndNotify(nextContestName);
 
         // It's a first check of the rate update for the contest.
@@ -114,26 +114,26 @@ function helper() {
         return;
     }
 
-    console.log(`Contest result is not fixed yet for ${nextContestName}.`);
+    console.log(`[${nextContestName}] Contest result is not fixed`);
 
     // But need to check if the rate for the last contest is updated.
     if (isRateUpdatedForLastFixedContest()) {
-        console.log(`Rate changes have been already notified for ${lastContestName}.`);
+        console.log(`[${lastContestName}] Rate changes have been already notified`);
         return;
     }
 
     const lastContestResultJson = getContestResultJSONNoLogin(lastContestName);
     if (lastContestResultJson === null) {
-        console.error(`Failed to get the contest result JSON for ${lastContestName}.`);
+        console.error(`[${lastContestName}] Failed to get the result JSON`);
         return;
     }
-    console.log(`JSON length for ${lastContestName}: ${lastContestResultJson.length}`);
+    console.log(`[${lastContestName}] JSON length: ${contestResultJson.length}`);
 
     previousJsonLength = getJSONLengthForLastFixedContest();
     if (lastContestResultJson.length === previousJsonLength) {
         // `previousJsonLength` must be greater than 0.
         // If the JSON length is not changing anymore, we consider it's completely updated.
-        console.log(`Ready to notify rate changes for ${lastContestName}.`);
+        console.log(`[${lastContestName}] Ready to notify rate changes`);
         addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, true);
         notifyNewRateInDiscord(lastContestResultJson, lastContestName);
     } else {
