@@ -325,7 +325,7 @@ function updateSheetAndNotify(contestName) {
     try {
         sendTweet(msg);
     } catch (err) {
-        msg += '\n(But it seems to failed to tweet.)';
+        msg += '\n(But seems it failed to tweet.)';
         console.error("Failed to tweet.");
     }
 
