@@ -26,56 +26,6 @@ function myFunction() {
     // notifyDiscordLastContestResult();
 }
 
-/*
- * Updated version with login
- */
-
-/**
- * Parses the hardcoded session cookie to extract the expiry timestamp.
- * @returns {number|null} The Unix timestamp (in seconds) of expiry, or null if not found/invalid.
- */
-function getSessionExpiryTimestamp() {
-    const ATCODER_SESSION =
-        PropertiesService.getScriptProperties().getProperty("ATCODER_SESSION");
-    try {
-        // Ensure the cookie variable is accessible
-        if (!ATCODER_SESSION || typeof ATCODER_SESSION !== 'string') {
-            console.error("Hardcoded session cookie is not defined or not a string.");
-            return null;
-        }
-
-        // Find the _TS part
-        const tsRegex = /_TS%3A(\d+)/; // Use regex to find _TS: followed by digits
-        const match = ATCODER_SESSION.match(tsRegex);
-
-        if (match && match[1]) {
-            const timestampSeconds = parseInt(match[1], 10);
-            if (!isNaN(timestampSeconds)) {
-                return timestampSeconds;
-            } else {
-                console.error("Failed to parse timestamp value from session cookie.");
-                return null;
-            }
-        } else {
-            console.error("Could not find '_TS:' timestamp in the hardcoded session cookie.");
-            return null;
-        }
-    } catch (e) {
-        console.error("Error parsing session cookie timestamp: " + e);
-        return null;
-    }
-}
-
-function getFormattedSessionExpiryDate() {
-    const expiryTimestampSeconds = getSessionExpiryTimestamp();
-    if (!expiryTimestampSeconds) return null;
-
-    const expiryDate = new Date(expiryTimestampSeconds * 1000);
-    const scriptTimeZone = Session.getScriptTimeZone(); // Get script's timezone for formatting
-    const formattedExpiryDate = Utilities.formatDate(expiryDate, scriptTimeZone, "yyyy-MM-dd HH:mm:ss z");
-    return formattedExpiryDate;
-}
-
 function assignCacheService() {
     if (CACHE_SERVICE) return;
 
@@ -96,25 +46,16 @@ function getLastContestName() {
 }
 
 /**
- * Check if the account session is still valid.
+ * Check if a request to AtCoder goes through
  *
  * If not, report it to LINE and Discord.
  */
 function healthCheck() {
-    const MSG =
-        "The AtCoder session may be expired!\n" +
-        "Please update it and test the script!";
+    const MSG = "[Health check] Something's broken";
     const TEST_CONTEST = "abc389";
+    const EXPECTED_JSON_LEN = 12393;
 
-    const session = loginAndGetSessionCookie();
-    if (session === null) {
-        console.error("Something went wrong while getting the session cookie.");
-        sendMessagesLINE([MSG]);
-        sendMsgDiscord(MSG);
-        return;
-    }
-
-    const contestResultJson = getContestResultJSON(TEST_CONTEST, session);
+    const contestResultJson = getContestResultJSONNoLogin(TEST_CONTEST);
     if (contestResultJson === null) {
         console.error(`Failed to get the contest result JSON for ${TEST_CONTEST}.`);
         sendMessagesLINE([MSG]);
@@ -122,32 +63,23 @@ function healthCheck() {
         return;
     }
 
-    if (contestResultJson.length === 0) {
-        console.error(`JSON's length for ${TEST_CONTEST} is 0. Something went wrong?`);
+    try {
+        if (contestResultJson.length !== EXPECTED_JSON_LEN) {
+            const err_msg = `JSON's length is expected to be ${EXPECTED_JSON_LEN}, but got ${contestResultJson.length}.`
+            console.error(err_msg);
+            sendMessagesLINE([MSG]);
+            sendMsgDiscord(MSG);
+            return;
+        }
+    } catch (err) {
+        console.error(`Checking JSON somehow failed!`);
         sendMessagesLINE([MSG]);
         sendMsgDiscord(MSG);
         return;
     }
+
     console.log(`Result length for ${TEST_CONTEST}: ${contestResultJson.length}`);
-    console.log("Session seems still valid!");
-}
-
-function noLoginTest() {
-    assignContestSheet();
-    const lastContestName = getLastContestName();
-    const lastContestNumber = parseInt(lastContestName.substr(3));
-    const nextContestName = `abc${lastContestNumber + 1}`;
-
-    const contestResultJson = getContestResultJSONNoLogin(nextContestName);
-    if (contestResultJson === null) {
-        const msg = `Couldn't get JSON without logging in for ${nextContestName}`;
-        sendMessagesLINE([msg]);
-    } else {
-        const msg = `Got JSON without logging in for ${nextContestName} with length ${contestResultJson.length}`;
-
-        // Print it as a log instead of a LINE msg
-        console.log(msg);
-    }
+    console.log("Health check passed.");
 }
 
 // Actual logic
@@ -164,79 +96,50 @@ function helper() {
     const nextContestName = `abc${lastContestNumber + 1}`;
     console.log(`Next contest: ${nextContestName}`)
 
-    const SLEEP_DURATION = 1000;
+    const contestResultJson = getContestResultJSONNoLogin(nextContestName);
+    if (contestResultJson === null) {
+        console.error(`Failed to get the contest result JSON for ${nextContestName}.`);
+        return;
+    }
+    console.log(`JSON length for ${nextContestName}: ${contestResultJson.length}`);
 
-    const TRIAL_COUNT = 2;
-    for (let i = 1; i <= TRIAL_COUNT; ++i) {
-        const sessionCookie = loginAndGetSessionCookie();
-        if (sessionCookie === null) {
-            console.error("Something went wrong while getting the session cookie.");
-            if (i + 1 <= TRIAL_COUNT) {
-                console.log(`Sleeping for ${SLEEP_DURATION}ms before retrying`);
-                Utilities.sleep(SLEEP_DURATION);
-            }
-            continue;
-        }
+    if (isContestResultFixed(contestResultJson)) {
+        console.log("Contest result is fixed.");
+        updateSheetAndNotify(nextContestName);
 
-        const contestResultJson = getContestResultJSON(nextContestName, sessionCookie);
-        if (contestResultJson === null) {
-            console.error(`Failed to get the contest result JSON for ${nextContestName}.`);
-            if (i + 1 <= TRIAL_COUNT) {
-                console.log(`Sleeping for ${SLEEP_DURATION} ms before retrying`);
-                Utilities.sleep(SLEEP_DURATION);
-            }
-            continue;
-        }
-        console.log(`Length of the contest ${nextContestName} result is ${contestResultJson.length}`);
-
-        if (isContestFixed(contestResultJson)) {
-            console.log("Contest result is fixed.");
-            updateSheetAndNotify(nextContestName);
-
-            // It's a first check of the rate update for the contest.
-            // So just record the JSON length (which should be greater than 0) and return,
-            // as it might be in the middle of the JSON update.
-            addContestJSONLengthAndFlagIntoSheet(contestResultJson.length, false);
-            return;
-        } else {
-            console.log(`Contest result is not fixed yet for ${nextContestName}.`);
-        }
-
-        // The next contest result is not fixed
-
-        // But need to check if the rate for the last contest is updated.
-        if (isRateUpdatedForLastFixedContest()) {
-            console.log(`Rate changes have been already notified for ${lastContestName}.`);
-            return;
-        }
-
-        const lastContestResultJson = getContestResultJSON(lastContestName, sessionCookie);
-        if (lastContestResultJson === null) {
-            console.error(`Failed to get the contest result JSON for ${lastContestName}.`);
-            if (i + 1 <= TRIAL_COUNT) {
-                console.log(`Sleeping for ${SLEEP_DURATION}ms before retrying`);
-                Utilities.sleep(SLEEP_DURATION);
-            }
-            continue;
-        }
-        console.log(`Length of the contest ${lastContestName} result is ${lastContestResultJson.length}`);
-
-        previousJsonLength = getJSONLengthForLastFixedContest();
-        if (lastContestResultJson.length === previousJsonLength) {
-            // `previousJsonLength` must be greater than 0.
-            // If the JSON length is not changing anymore, we consider it's completely updated.
-            console.log(`Ready to notify rate changes for ${lastContestName}.`);
-            addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, true);
-            notifyNewRateInDiscord(lastContestResultJson, lastContestName);
-        } else {
-            // JSON is still being updated.
-            addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, false);
-        }
-        // No need to retry at this point. Just return.
+        // It's a first check of the rate update for the contest.
+        // So just record the JSON length (which should be greater than 0) and return,
+        // as it might be in the middle of the JSON update.
+        addContestJSONLengthAndFlagIntoSheet(contestResultJson.length, false);
         return;
     }
 
-    throw new Error("Failed to get contest data.");
+    console.log(`Contest result is not fixed yet for ${nextContestName}.`);
+
+    // But need to check if the rate for the last contest is updated.
+    if (isRateUpdatedForLastFixedContest()) {
+        console.log(`Rate changes have been already notified for ${lastContestName}.`);
+        return;
+    }
+
+    const lastContestResultJson = getContestResultJSONNoLogin(lastContestName);
+    if (lastContestResultJson === null) {
+        console.error(`Failed to get the contest result JSON for ${lastContestName}.`);
+        return;
+    }
+    console.log(`JSON length for ${lastContestName}: ${lastContestResultJson.length}`);
+
+    previousJsonLength = getJSONLengthForLastFixedContest();
+    if (lastContestResultJson.length === previousJsonLength) {
+        // `previousJsonLength` must be greater than 0.
+        // If the JSON length is not changing anymore, we consider it's completely updated.
+        console.log(`Ready to notify rate changes for ${lastContestName}.`);
+        addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, true);
+        notifyNewRateInDiscord(lastContestResultJson, lastContestName);
+    } else {
+        // JSON is still being updated.
+        addContestJSONLengthAndFlagIntoSheet(lastContestResultJson.length, false);
+    }
 }
 
 function notifyIfContestFixed() {
@@ -246,31 +149,6 @@ function notifyIfContestFixed() {
     } else {
         console.log("Not in time range.");
     }
-}
-
-function getContestResultJSON(contestName, sessionCookie) {
-    // Maybe session is not needed anymore???
-    // `curl https://atcoder.jp/contests/abc388/results/json` returned the result!
-    const options = {
-        muteHttpExceptions: true,
-        headers: {
-            'Cookie': sessionCookie
-        },
-        followRedirects: false,
-    };
-
-    const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/results/json`;
-    const response = UrlFetchApp.fetch(contestStandingUrl, options);
-
-    if (response.getResponseCode() !== 200) {
-        console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
-        console.log("HTML content:");
-        console.log(response.getContentText("UTF-8"));
-        return null;
-    }
-
-    const htmlText = response.getContentText();
-    return JSON.parse(htmlText);
 }
 
 function getContestResultJSONNoLogin(contestName) {
@@ -288,106 +166,13 @@ function getContestResultJSONNoLogin(contestName) {
     return JSON.parse(htmlText);
 }
 
-function isContestFixed(contestResultJson) {
+function isContestResultFixed(contestResultJson) {
     return contestResultJson.length > 0;
-}
-
-function decodeHtmlEntities(str) {
-    return str.replace(/&#(\d+);/g, function (_, dec) {
-        return String.fromCharCode(dec);
-    });
 }
 
 function clearCachedSession() {
     assignCacheService();
     CacheService.getScriptCache().remove(SESSION_COOKIE_CACHE_NAME);
-}
-
-/* This function caches the session */
-function loginAndGetSessionCookie() {
-    // HACK: Use the hardcoded session because AtCoder changed
-    //       how to login.
-
-    // Value of REVEL_SESSION (the prefix "REVEL_SESSION=" is not needed)
-    const ATCODER_SESSION =
-        PropertiesService.getScriptProperties().getProperty("ATCODER_SESSION");
-    return ATCODER_SESSION;
-
-    assignCacheService();
-    const cachedSessionCookie = CACHE_SERVICE.get(SESSION_COOKIE_CACHE_NAME);
-    if (cachedSessionCookie) {
-        return cachedSessionCookie;
-    }
-
-    console.log("Not found cached session cookie. Getting new one.");
-
-    const LOGIN_URL = 'https://atcoder.jp/login';
-
-    // Step 1: Fetch the login page and extract the CSRF token
-    let response = UrlFetchApp.fetch(LOGIN_URL, { muteHttpExceptions: true });
-    if (response.getResponseCode() !== 200) {
-        console.error(`Login request to ${LOGIN_URL} failed. Status code: ${response.getResponseCode()}`);
-        console.log("HTML content:")
-        console.log(response.getContentText("UTF-8"));
-        return null;
-    }
-
-    const html = response.getContentText("UTF-8");
-    const csrfTokenRegex = /<input type="hidden" name="csrf_token" value="([^"]+)".*>/;
-    const csrfTokenMatch = csrfTokenRegex.exec(html);
-    if (!csrfTokenMatch) {
-        console.error("Failed to find the CSRF token.");
-        return null;
-    }
-
-    const csrfToken = decodeHtmlEntities(csrfTokenMatch[1]);
-
-    // Step 2: Send a POST request with your login credentials and the extracted CSRF token
-    const username = PropertiesService.getScriptProperties().getProperty("ATCODER_USERNAME");
-    const password = PropertiesService.getScriptProperties().getProperty("ATCODER_PASSWORD");
-    const payload = {
-        username: encodeURIComponent(username),
-        password: encodeURIComponent(password),
-        csrf_token: encodeURIComponent(csrfToken)
-    };
-
-    const formData = `username=${payload.username}&password=${payload.password}&csrf_token=${payload.csrf_token}`;
-
-    const options = {
-        method: 'post',
-        payload: formData,
-        muteHttpExceptions: true,
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Cookie': response.getAllHeaders()['Set-Cookie'].join('; ')
-        },
-        followRedirects: false,
-    };
-
-    response = UrlFetchApp.fetch(LOGIN_URL, options);
-    if (response.getResponseCode() < 300 || response.getResponseCode() >= 400) {
-        console.error(`Login request to ${LOGIN_URL} failed. Status code: ${response.getResponseCode()}`);
-        console.log("HTML content:")
-        console.log(response.getContentText("UTF-8"));
-        return null;
-    }
-
-    const redirectLocation = response.getHeaders()['Location'];
-    if (redirectLocation != "/home") {
-        console.log({ redirectLocation })
-        console.error("Failed to login. Maybe wrong username or password?");
-        return null;
-    }
-
-    console.log("Successfully logged in to AtCoder.")
-
-    // Step 3: Extract the session cookie and cache it
-    const setCookieArray = response.getAllHeaders()['Set-Cookie'];
-    const sessionCookie = setCookieArray.find(cookie => cookie.startsWith('REVEL_SESSION')).split(';')[0];
-
-    CACHE_SERVICE.put(SESSION_COOKIE_CACHE_NAME, sessionCookie, 3600);
-
-    return sessionCookie;
 }
 
 /** Update sheets */
@@ -512,13 +297,6 @@ function notifyNewRateInDiscord(contestResultJson, contestName) {
 
     if (!participated) {
         msg += "\n誰もRatedで参加しなかったようだ👎";
-    }
-
-    const sessionExpiryDate = getFormattedSessionExpiryDate();
-    if (sessionExpiryDate) {
-        msg += `\nデバッグ情報: Next session expiry: ${getFormattedSessionExpiryDate()}`;
-    } else {
-        msg += `\nデバッグ情報: Failed to get session expiry date.`;
     }
 
     sendMsgDiscord(msg);
