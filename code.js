@@ -189,6 +189,22 @@ function assignContestSheet() {
 }
 /** Update sheets */
 
+/**
+ * Checks if the current time is appropriate for polling AtCoder contest results
+ *
+ * Rationale: AtCoder ABC contests typically run Fri/Sat/Sun evenings. Results
+ * are usually posted the same evening or the next morning. This function limits
+ * checks to these likely periods to conserve resources (GAS's execution limit)
+ *
+ * Active Windows (Script's Time Zone):
+ * - Fri: 19:00 onwards
+ * - Sat: < 10:00 OR >= 19:00
+ * - Sun: < 10:00 OR >= 19:00
+ * - Mon: < 10:00
+ * Checks are disabled on Tue, Wed, Thu.
+ *
+ * @returns {boolean} True if the current time is within an active check window.
+ */
 function inTimeRange() {
     const now = new Date();
 
