@@ -60,7 +60,7 @@ function healthCheck() {
         console.error(`[${TEST_CONTEST}] Failed to get the result JSON`);
         sendMessagesLINE([MSG]);
         sendMsgDiscord(MSG);
-        return;
+        throw new Error("Health check failed.");
     }
 
     try {
@@ -69,13 +69,13 @@ function healthCheck() {
             console.error(err_msg);
             sendMessagesLINE([MSG]);
             sendMsgDiscord(MSG);
-            return;
+            throw new Error("Health check failed.");
         }
     } catch (err) {
         console.error(`Checking JSON somehow failed!`);
         sendMessagesLINE([MSG]);
         sendMsgDiscord(MSG);
-        return;
+        throw new Error("Health check failed.");
     }
 
     console.log(`[${TEST_CONTEST}] Result length: ${contestResultJson.length}`);
@@ -98,8 +98,7 @@ function helper() {
 
     const contestResultJson = getContestResultJSONNoLogin(nextContestName);
     if (contestResultJson === null) {
-        console.error(`[${nextContestName}] Failed to get the result JSON`);
-        return;
+        throw new Error(`[${nextContestName}] Failed to get the result JSON`);
     }
     console.log(`[${nextContestName}] JSON length: ${contestResultJson.length}`);
 
@@ -124,8 +123,7 @@ function helper() {
 
     const lastContestResultJson = getContestResultJSONNoLogin(lastContestName);
     if (lastContestResultJson === null) {
-        console.error(`[${lastContestName}] Failed to get the result JSON`);
-        return;
+        throw new Error(`[${lastContestName}] Failed to get the result JSON`);
     }
     console.log(`[${lastContestName}] JSON length: ${contestResultJson.length}`);
 
@@ -153,7 +151,11 @@ function notifyIfContestFixed() {
 
 function getContestResultJSONNoLogin(contestName) {
     const contestStandingUrl = `https://atcoder.jp/contests/${contestName}/results/json`;
-    const response = UrlFetchApp.fetch(contestStandingUrl);
+    const options = {
+        "method": "get",
+        "muteHttpExceptions": true,
+    }
+    const response = UrlFetchApp.fetch(contestStandingUrl, options);
 
     if (response.getResponseCode() !== 200) {
         console.error(`Request to ${contestStandingUrl} failed. Status code: ${response.getResponseCode()}`);
